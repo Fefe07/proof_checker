@@ -1,0 +1,6 @@
+
+
+Proof(Hyp : {p,Not(p)}; Conc : Bot)
+	NotE(p)
+		Ax
+		Ax
