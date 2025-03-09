@@ -53,8 +53,36 @@ let rec check (a:arbre_preuve) : bool =
 			| And(f,g) -> f = a.conclusion || g = a.conclusion && a.premisses = t1.premisses
 			| _ -> false end
 		| _ -> false end
-	(* | "OrE" -> begin match a.l with 
-		| [t1;t2;t3] -> begin match t1. *)
+	| "OrE" -> begin match a.l with 
+		| [t1;t2;t3]  -> begin match t1.conclusion with 
+			| Or(f,g) -> ((t2.premisses = f :: a.premisses && t3.premisses = g :: a.premisses)
+				|| (t2.premisses = g :: a.premisses && t3.premisses = f :: a.premisses))
+				&& t2.conclusion = a.conclusion
+				&& t3.conclusion = a.conclusion
+				&& t1.premisses = a.premisses 
+			| _ -> false end
+		|| begin match t1.conclusion with 
+			| Or(f,g) -> ((t1.premisses = f :: a.premisses && t3.premisses = g :: a.premisses)
+				|| (t1.premisses = g :: a.premisses && t3.premisses = f :: a.premisses))
+				&& t1.conclusion = a.conclusion
+				&& t3.conclusion = a.conclusion
+				&& t2.premisses = a.premisses 
+			| _ -> false end
+		|| begin match t1.conclusion with 
+			| Or(f,g) -> ((t2.premisses = f :: a.premisses && t1.premisses = g :: a.premisses)
+				|| (t2.premisses = g :: a.premisses && t1.premisses = f :: a.premisses))
+				&& t2.conclusion = a.conclusion
+				&& t1.conclusion = a.conclusion
+				&& t3.premisses = a.premisses 
+			| _ -> false end
+		| _ -> false end
+	| "ImplyE" -> begin match a.l with
+		| [t1;t2] -> begin match t1.conclusion with
+			|Imply(f,g) -> (f = t2.conclusion && g = a.conclusion) || (g = t2.conclusion && f = a.conclusion)
+				&& t1.premisses = a.premisses
+				&& t2.premisses = a.premisses
+			| _ -> false end
+		| _ -> false end
   | _ -> false 
   end 
   && List.for_all check a.l
@@ -133,11 +161,14 @@ let lexer (s : string) : token list =
   lexer_rec (List.of_seq (String.to_seq s))
 
 
-let test = "Proof(Hyp : {p,Not(p)}; Conc : Bot) 
+let test1 = "Proof(Hyp : {p,Not(p)}; Conc : Bot) 
 	NotE(p) 
 		Ax
 		Ax"
 
+let test2 = "Proof(Hyp : {And(p,q)}; Conc : p)
+	AndE(q)
+		Ax"
 
 (* Ces deux defs sont equivalentes *)
 let (let$) = Option.bind
@@ -269,12 +300,23 @@ let parser (l : token list) : arbre_preuve option =
 		| Identifier("NotE") -> begin
 			let$ truc = next l' in 
 			let+ __ = (truc = LParen) in
-			let$ form = read_form l' in
+			let$ f = read_form l' in
 			let$ truc = next l' in 
 			let+ __ = (truc = RParen) in
-			let$ arbre1 = lire_arbre hypotheses form in
-			let$ arbre2 = lire_arbre hypotheses (Not(form)) in
+			let$ arbre1 = lire_arbre hypotheses f in
+			let$ arbre2 = lire_arbre hypotheses (Not(f)) in
 			Some({name = "NotE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1;arbre2]})
+		end
+		| Identifier("AndE") -> begin
+			
+			let$ truc = next l' in 
+			let+ __ = (truc = LParen) in
+			let$ f = read_form l' in
+			let$ truc = next l' in 
+			let+ __ = (truc = RParen) in
+			let$ arbre1 = lire_arbre hypotheses (And(f,conclusion)) in
+			(* IL FAUT PRENDRE EN COMPTE LES DEUX ORDRES ! *)
+			Some({name = "AndE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1]})
 		end
 		| Identifier("Ax") -> Some({name = "Ax";premisses = hypotheses ; conclusion = conclusion; l = []})
 		| _ -> None

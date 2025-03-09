@@ -4,3 +4,8 @@ Proof(Hyp : {p,Not(p)}; Conc : Bot)
 	NotE(p)
 		Ax
 		Ax
+		
+		
+Proof(Hyp : {And(p,q)}; Conc : Bot)
+	AndE(q)
+		Ax
