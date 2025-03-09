@@ -7,47 +7,54 @@ type form =
   | Or of form * form
   | Imply of form * form
 
-type sequent = { premisses : form list ; conclusion : form} 
 
-type arbre_preuve = { name:string ; s:sequent; l:arbre_preuve list}
+
+type arbre_preuve = { name:string ; premisses : form list ; conclusion : form; l:arbre_preuve list}
 
 (* La fonction suivante vérifie la correction*)
 let rec check (a:arbre_preuve) : bool = 
   (* Essaye de reconnaître une règle de la logique intuitionniste*)
   begin match a.name with
-  | "Ax" -> (List.exists (fun f -> f = a.s.conclusion) a.s.premisses ) && a.l = []
-  | "TopI" -> a.s.conclusion = Top && a.l = []
+  | "Ax" -> (List.exists (fun f -> f = a.conclusion) a.premisses ) && a.l = []
+  | "TopI" -> a.conclusion = Top && a.l = []
   | "BotE" -> begin match a.l with 
-		| [t1] -> t1.s.conclusion = Bot  && t1.s.premisses = a.s.premisses
+		| [t1] -> t1.conclusion = Bot  && t1.premisses = a.premisses
 		| _ -> false end
-  | "OuI" -> begin match a.l with 
-		| [t1] -> begin match a.s.conclusion with 
-			|Or(x,y) -> (t1.s.conclusion = x || t1.s.conclusion = y) && t1.s.premisses = a.s.premisses
+  | "OrI" -> begin match a.l with 
+		| [t1] -> begin match a.conclusion with 
+			|Or(x,y) -> (t1.conclusion = x || t1.conclusion = y) && t1.premisses = a.premisses
 			| _ -> false end
 		| _ -> false end   
-  | "EtI" -> begin match a.l with 
-		| [t1;t2] -> begin match a.s.conclusion with 
-	  	|And(x,y) -> ((t1.s.conclusion = x && t2.s.conclusion = y) || (t1.s.conclusion = y && t2.s.conclusion = x)) 
-			&& t1.s.premisses = a.s.premisses && t2.s.premisses = a.s.premisses
+  | "AndI" -> begin match a.l with 
+		| [t1;t2] -> begin match a.conclusion with 
+	  	|And(x,y) -> ((t1.conclusion = x && t2.conclusion = y) || (t1.conclusion = y && t2.conclusion = x)) 
+			&& t1.premisses = a.premisses && t2.premisses = a.premisses
 	  	| _ -> false end
 		| _ -> false end   
-  | "NonI" -> begin match a.l with
-		| [t1] -> begin match t1.s.premisses with 
-			| phi :: gamma -> Not(phi) = a.s.conclusion && gamma = a.s.premisses && t1.s.conclusion = Bot
+  | "NotI" -> begin match a.l with
+		| [t1] -> begin match t1.premisses with 
+			| phi :: gamma -> Not(phi) = a.conclusion && gamma = a.premisses && t1.conclusion = Bot
 			| _ -> false end
 		| _ -> false end
-  | "ImplI" -> begin match a.l with 
-		| [t1] -> begin match t1.s.premisses with 
-			| phi :: gamma -> a.s.conclusion = Imply(phi,t1.s.conclusion) && gamma = a.s.premisses
+  | "ImplyI" -> begin match a.l with 
+		| [t1] -> begin match t1.premisses with 
+			| phi :: gamma -> a.conclusion = Imply(phi,t1.conclusion) && gamma = a.premisses
 			| _ -> false end 
 		| _ -> false end 
 	| "NotE" -> begin match a.l with 
 		| [t1;t2] -> 
-			a.s.conclusion = Bot
-			&& t1.s.premisses = t2.s.premisses
-			&& (t1.s.conclusion = Not(t2.s.conclusion) 
-			|| t2.s.conclusion = Not(t1.s.conclusion))
+			a.conclusion = Bot
+			&& t1.premisses = t2.premisses
+			&& (t1.conclusion = Not(t2.conclusion) 
+			|| t2.conclusion = Not(t1.conclusion))
 		| _ -> false end
+	| "AndE" -> begin match a.l with
+		| [t1] -> begin match t1.conclusion with
+			| And(f,g) -> f = a.conclusion || g = a.conclusion && a.premisses = t1.premisses
+			| _ -> false end
+		| _ -> false end
+	(* | "OrE" -> begin match a.l with 
+		| [t1;t2;t3] -> begin match t1. *)
   | _ -> false 
   end 
   && List.for_all check a.l
@@ -57,11 +64,9 @@ let print_bool b =
 
 let () = 
   let p = Var("p") in 
-  let s1 = {premisses = [p]; conclusion = p} in 
-  let a = {name = "ax" ; s = s1; l = []} in 
-  let g = Or(Var("p"), Var("q")) in
-  let s2 = {premisses = [p]; conclusion = g} in 
-  let a2 = {name = "oui"; s = s2; l = [a]} in
+  let a = {name = "Ax" ; premisses = [p]; conclusion = p; l = []} in 
+  let g = Or(Var("p"), Var("q")) in 
+  let a2 = {name = "OrI"; premisses = [p]; conclusion = g; l = [a]} in
   print_bool (check a2) ;
   print_newline ()
 
@@ -160,7 +165,7 @@ let next (stream: 'a list ref): 'a option =
 		stream := tail;
 		Some head
 
-(* Bouffe un truc mais c'est pas grave *)
+(* Bouffe le RBracket mais c'est pas grave *)
 let rec read_form (l' : token list ref) : form option =
 	let$ truc = next l' in
 	match truc with
@@ -175,7 +180,39 @@ let rec read_form (l' : token list ref) : form option =
 		let$ truc = next l' in
 		let+ __ = (truc = RParen) in 
 		Some(Not(g)) 
-		
+		end
+	| Identifier("And") -> begin 
+		let$ truc = next l' in 
+		let+ __ = (truc = LParen) in 
+		let$ g = read_form l' in
+		let$ truc = next l' in
+		let+ __ = (truc = Comma) in
+		let$ h = read_form l' in 
+		let$ truc = next l' in
+		let+ __ = (truc = RParen) in 
+		Some(And(g,h)) 
+		end
+	| Identifier("Or") -> begin 
+		let$ truc = next l' in 
+		let+ __ = (truc = LParen) in 
+		let$ g = read_form l' in
+		let$ truc = next l' in
+		let+ __ = (truc = Comma) in
+		let$ h = read_form l' in 
+		let$ truc = next l' in
+		let+ __ = (truc = RParen) in 
+		Some(Or(g,h)) 
+		end
+	| Identifier("Imply") -> begin 
+		let$ truc = next l' in 
+		let+ __ = (truc = LParen) in 
+		let$ g = read_form l' in
+		let$ truc = next l' in
+		let+ __ = (truc = Comma) in
+		let$ h = read_form l' in 
+		let$ truc = next l' in
+		let+ __ = (truc = RParen) in 
+		Some(Imply(g,h)) 
 		end
 	| _ -> None
 
@@ -203,23 +240,24 @@ let parser (l : token list) : arbre_preuve option =
 	let l' = ref l in
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Proof")) in
-	Printf.printf "Coucou\n" ;
+	(* Printf.printf "Coucou\n" ; *)
 	let$ truc = next l' in 
 	let+ __ = (truc = LParen) in
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Hyp")) in
-	Printf.printf "Coucou\n" ;
+	(* Printf.printf "Coucou\n" ; *)
 	let$ hyps = read_form_list l' in
-	Printf.printf "Coucou\n" ;
+	(* Pas besoin de lire le RBrakcet, il a été bouffé par le read_form_list*)
+	(* Printf.printf "Coucou\n" ; *)
 	let$ truc = next l' in 
 	let+ __ = (truc = Semicolon) in
-	Printf.printf "Coucou\n" ;
+	(* Printf.printf "Coucou\n" ; *)
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Conc")) in
-	Printf.printf "Coucou\n" ;
+	(* Printf.printf "Coucou\n" ; *)
 	let$ truc = next l' in 
 	let+ __ = (truc = Colon) in
-	Printf.printf "Coucou\n" ;
+	(* Printf.printf "Coucou\n" ; *)
 	let$ conc = read_form l' in 
 	let$ truc = next l' in 
 	let+ __ = (truc = RParen) in
@@ -236,9 +274,9 @@ let parser (l : token list) : arbre_preuve option =
 			let+ __ = (truc = RParen) in
 			let$ arbre1 = lire_arbre hypotheses form in
 			let$ arbre2 = lire_arbre hypotheses (Not(form)) in
-			Some({name = "NotE"; s={premisses = hypotheses ; conclusion = conclusion}; l = [arbre1;arbre2]})
+			Some({name = "NotE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1;arbre2]})
 		end
-		| Identifier("Ax") -> Some({name = "Ax";s={premisses = hypotheses ; conclusion = conclusion}; l = []})
+		| Identifier("Ax") -> Some({name = "Ax";premisses = hypotheses ; conclusion = conclusion; l = []})
 		| _ -> None
 	in
 	lire_arbre hyps conc
