@@ -83,6 +83,7 @@ let lexer (s : string) : token list =
 		| ':' :: s' -> Colon :: lexer_rec s' 
 		| ',' :: s' -> Comma :: lexer_rec s'
 		| ';' :: s' -> Semicolon :: lexer_rec s'
+		| '\n' :: s'
 		| ' ' :: s' -> lexer_rec s'
 		| 'a'..'z' :: _ -> read_var s 
 		| 'A'..'Z' :: _ -> read_ID s 
@@ -105,16 +106,18 @@ let lexer (s : string) : token list =
 	let (name,s') = aux s in 
 	Identifier(String.of_seq(List.to_seq name))::lexer_rec s'
   in
-  List.rev (lexer_rec(List.of_seq(String.to_seq s)))
+  lexer_rec(List.of_seq(String.to_seq s))
 
 
-let (let*) = Option.bind
+(* Ces deux defs sont equivalentes *)
+let (let$) = Option.bind
 
-let (let*) value cont =
+let (let$) value cont =
   match value with
   | None -> None
-  | Some x -> cont x
+  | Some x -> cont x 
 
+(* Assert pred *)
 let (let+) pred cont =
   if pred then cont () else None
 
@@ -132,13 +135,87 @@ let next (stream: 'a list ref): 'a option =
 		stream := tail;
 		Some head
 
-let parser (l : token list) : arbre_preuve option =
-	let proof = read Identifier("Proof") l in 
-	let l = read LParen l in 
-	let l = read Identifier("Hyp") in 
-	let* var = next (??) in
-	let+ __ = (var = LParen) in
-	...
-	blabla;
+(* Bouffe un truc mais c'est pas grave *)
+let rec read_form (l' : token list ref) : form option =
+	let$ truc = next l' in
+	match truc with
+	| Identifier("Top") -> Some(Top)
+  | Identifier("Bot") -> Some(Bot)
+  | Identifier("Var") -> begin 
+		let$ truc = next l' in 
+		let+ __ = (truc = LParen) in 
+		let$ truc = next l' in 
+		match truc with
+		| VarID(p) -> 
+			let$ truc = next l' in 
+			let+ __ = (truc = RParen) in
+			Some(Var(p)) 
+		| _ -> None
+		end
+	| Identifier("Not") -> begin 
+		let$ truc = next l' in 
+		let+ __ = (truc = LParen) in 
+		let$ g = read_form l' in
+		let$ truc = next l' in
+		let+ __ = (truc = RParen) in 
+		Some(Not(g)) 
+		
+		end
+	| _ -> None
 
-(fun var -> blabla)
+
+exception Finished
+let read_form_list (l':token list ref) : form list option = 
+	let$ truc = next l' in 
+	let+ __ = (truc = Colon) in
+	let$ truc = next l' in 
+	let+ __ = (truc = LBracket) in
+	let liste = ref [] in
+	try
+		while true do 
+			match read_form l' with
+			| Some(g) -> liste:= g :: !liste ; 
+			| None -> raise Finished
+		done 
+	with 
+	| Finished -> Some !liste
+				
+
+let parser (l : token list) : arbre_preuve option =
+	(* Renvoie None en cas d'échec *)
+	let l' = ref l in
+	let$ truc = next l' in 
+	let+ __ = (truc = Identifier("Proof")) in
+	let$ truc = next l' in 
+	let+ __ = (truc = LParen) in
+	let$ truc = next l' in 
+	let+ __ = (truc = Identifier("Hyp")) in
+	let$ hyps = read_form_list l' in
+	let$ truc = next l' in 
+	let+ __ = (truc = Semicolon) in
+	let$ truc = next l' in 
+	let+ __ = (truc = Identifier("Conc")) in
+	let$ truc = next l' in 
+	let+ __ = (truc = Colon) in
+	let$ conc = read_form l' in 
+	let$ truc = next l' in 
+	let+ __ = (truc = RParen) in
+
+	let rec lire_arbre (hypotheses : form list)(conclusion : form) : arbre_preuve option =
+		let$ regle = next l' in
+		match regle with
+		| Identifier("NotE") -> begin
+			let$ truc = next l' in 
+			let+ __ = (truc = LParen) in
+			let$ form = read_form l' in
+			let$ arbre1 = lire_arbre hypotheses form in
+			let$ arbre2 = lire_arbre hypotheses (Not(form)) in
+			Some({name = "NotE"; s={premisses = hypotheses ; conclusion = conclusion}; l = [arbre1;arbre2]})
+		end
+		| Identifier("Ax") -> Some({name = "Ax";s={premisses = hypotheses ; conclusion = conclusion}; l = []})
+		| _ -> None
+	in
+	lire_arbre hyps conc
+
+
+
