@@ -297,6 +297,10 @@ let parser (l : token list) : arbre_preuve option =
 	let rec lire_arbre (hypotheses : form list)(conclusion : form) : arbre_preuve option =
 		let$ regle = next l' in
 		match regle with
+		| Identifier("BotE") -> begin 
+			let$ arbre1 = lire_arbre hypotheses Bot in 
+			Some({name = "BotE"; premisses = hypotheses; conclusion = conclusion; l = [arbre1]})
+		end
 		| Identifier("NotE") -> begin
 			let$ truc = next l' in 
 			let+ __ = (truc = LParen) in
@@ -307,16 +311,99 @@ let parser (l : token list) : arbre_preuve option =
 			let$ arbre2 = lire_arbre hypotheses (Not(f)) in
 			Some({name = "NotE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1;arbre2]})
 		end
-		| Identifier("AndE") -> begin
-			
+		| Identifier("AndEL") -> begin
+			(* Rajoute l'argument à gauche du ^ *)
 			let$ truc = next l' in 
 			let+ __ = (truc = LParen) in
 			let$ f = read_form l' in
 			let$ truc = next l' in 
 			let+ __ = (truc = RParen) in
 			let$ arbre1 = lire_arbre hypotheses (And(f,conclusion)) in
-			(* IL FAUT PRENDRE EN COMPTE LES DEUX ORDRES ! *)
 			Some({name = "AndE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1]})
+		end
+		| Identifier("AndER") -> begin
+			(* Rajoute l'argument à droite du ^ *)
+			let$ truc = next l' in 
+			let+ __ = (truc = LParen) in
+			let$ f = read_form l' in
+			let$ truc = next l' in 
+			let+ __ = (truc = RParen) in
+			let$ arbre1 = lire_arbre hypotheses (And(conclusion,f)) in
+			Some({name = "AndE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1]})
+		end
+		| Identifier("OrE") -> begin
+			
+			let$ truc = next l' in 
+			let+ __ = (truc = LParen) in
+			let$ phi1 = read_form l' in
+			let$ truc = next l' in 
+			let+ __ = (truc = Comma) in
+			let$ phi2 = read_form l' in
+			let$ truc = next l' in 
+			let+ __ = (truc = RParen) in
+			let$ arbre1 = lire_arbre hypotheses (Or(phi1,phi2)) in
+			let$ arbre2 = lire_arbre (phi1::hypotheses) conclusion in 
+			let$ arbre3 = lire_arbre (phi2::hypotheses) conclusion in
+			Some({name = "OrE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1;arbre2;arbre3]})
+		end
+		| Identifier("ImplyE") -> begin
+			
+			let$ truc = next l' in 
+			let+ __ = (truc = LParen) in
+			let$ phi = read_form l' in
+			let$ truc = next l' in 
+			let+ __ = (truc = RParen) in
+			let$ arbre1 = lire_arbre hypotheses (Imply(phi,conclusion)) in
+			let$ arbre2 = lire_arbre hypotheses phi in 
+			Some({name = "AndE"; premisses = hypotheses ; conclusion = conclusion; l = [arbre1;arbre2]})
+		end
+		| Identifier("NotI") -> begin
+			match conclusion with 
+			| Not(phi) -> begin 
+				let$ arbre1 = lire_arbre (phi::hypotheses) Bot in 
+				Some({name = "NotI"; premisses = hypotheses; conclusion = conclusion; l=[arbre1]})
+			end
+			| _ -> None
+		end 
+		| Identifier("AndI") -> begin 
+			match conclusion with 
+			| And(phi1,phi2) -> begin 
+				let$ arbre1 = lire_arbre hypotheses phi1 in 
+				let$ arbre2 = lire_arbre hypotheses phi2 in 
+				Some({name = "AndI"; premisses = hypotheses; conclusion = conclusion; l=[arbre1;arbre2]})
+			end
+			| _ -> None
+		end
+		| Identifier("OrIL") -> begin 
+			match conclusion with 
+			| Or(phi,_) -> begin 
+				let$ arbre1 = lire_arbre hypotheses phi in 
+				Some({name = "OrI"; premisses = hypotheses; conclusion = conclusion; l=[arbre1]})
+			end
+			| _ -> None
+		end
+		| Identifier("OrIR") -> begin 
+			match conclusion with 
+			| Or(_,phi) -> begin 
+				let$ arbre1 = lire_arbre hypotheses phi in 
+				Some({name = "OrI"; premisses = hypotheses; conclusion = conclusion; l=[arbre1]})
+			end
+			| _ -> None
+		end
+		| Identifier("TopI") -> begin 
+			match conclusion with 
+			| Top -> begin 
+				Some({name = "TopI"; premisses = hypotheses; conclusion = conclusion; l=[]})
+			end
+			| _ -> None
+		end
+		| Identifier("ImplyI") -> begin 
+			match conclusion with 
+			| Imply(phi,psi) -> begin 
+				let$ arbre1 = lire_arbre (phi::hypotheses) psi in 
+				Some({name = "ImplyI"; premisses = hypotheses; conclusion = conclusion; l=[arbre1]})
+			end
+			| _ -> None
 		end
 		| Identifier("Ax") -> Some({name = "Ax";premisses = hypotheses ; conclusion = conclusion; l = []})
 		| _ -> None

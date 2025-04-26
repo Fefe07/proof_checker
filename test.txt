@@ -6,6 +6,6 @@ Proof(Hyp : {p,Not(p)}; Conc : Bot)
 		Ax
 		
 		
-Proof(Hyp : {And(p,q)}; Conc : Bot)
-	AndE(q)
+Proof(Hyp : {And(p,q)}; Conc : p)
+	AndER(q)
 		Ax
