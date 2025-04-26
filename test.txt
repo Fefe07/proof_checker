@@ -9,3 +9,13 @@ Proof(Hyp : {p,Not(p)}; Conc : Bot)
 Proof(Hyp : {And(p,q)}; Conc : p)
 	AndER(q)
 		Ax
+		
+		
+Proof(Hyp : {Not(Not(p)),Or(p,Not(p))}; Conc : p)
+	OrE(p,Not(p))
+		Ax
+		Ax
+		BotE
+			NotE(Not(p))
+				Ax
+				Ax
