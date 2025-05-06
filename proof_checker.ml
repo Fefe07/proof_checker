@@ -254,7 +254,7 @@ let read_form_list (l':token list ref) : form list option =
 	let+ __ = (truc = Colon) in
 	let$ truc = next l' in 
 	let+ __ = (truc = LBracket) in
-	Printf.printf "Coucou_rfl\n" ;
+	(* Printf.printf "Coucou_rfl\n" ;*)
 	let liste = ref [] in
 	try
 		while true do 
@@ -266,33 +266,33 @@ let read_form_list (l':token list ref) : form list option =
 	| Finished -> Some !liste
 				
 
-let parser (l : token list) : arbre_preuve option =
+let parse (l : token list) : arbre_preuve option =
 	(* Renvoie None en cas d'échec *)
 	let l' = ref l in
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Proof")) in
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ truc = next l' in 
 	let+ __ = (truc = LParen) in
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Hyp")) in
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ hyps = read_form_list l' in
 	(* Pas besoin de lire le RBrakcet, il a été bouffé par le read_form_list*)
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ truc = next l' in 
 	let+ __ = (truc = Semicolon) in
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ truc = next l' in 
 	let+ __ = (truc = Identifier("Conc")) in
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ truc = next l' in 
 	let+ __ = (truc = Colon) in
-	(* Printf.printf "Coucou\n" ; *)
+
 	let$ conc = read_form l' in 
 	let$ truc = next l' in 
 	let+ __ = (truc = RParen) in
-	Printf.printf "On a lu les hypotheses et conclusions :)\n" ;
+	(* Printf.printf "On a lu les hypotheses et conclusions :)\n" ;*)
 
 	let rec lire_arbre (hypotheses : form list)(conclusion : form) : arbre_preuve option =
 		let$ regle = next l' in
@@ -412,3 +412,4 @@ let parser (l : token list) : arbre_preuve option =
 
 
 
+let check_string (s : string) : bool = check (Option.get (parse (lexer s))) 
