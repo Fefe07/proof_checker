@@ -21,6 +21,6 @@ As I am French, a part of the code is written in French
 
 ## Future upgrades
 - Add the classical logic (proof by contradiction, double negation elimination, excluded middle)
-- Implement forst-order logic
+- Implement first-order logic
 - Code a partially correct brute-force alogorithm to automatically prove correct formulae (incorrect ones would cause the machine to loop)
 
